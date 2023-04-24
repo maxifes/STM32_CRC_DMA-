@@ -20,31 +20,86 @@
 #include <registers.h>
 
 
-#define MEMSIZE 32
+#define NUM_WORDS 3
+#define FLASH_START_ADDRESS 0x08000000
+#define CRC_DR_ADDRESS 0x40023000
 
-uint16_t source[MEMSIZE];
-uint16_t destination[MEMSIZE];
+uint32_t source[NUM_WORDS];
+uint32_t destination[NUM_WORDS];
+
+void CRC_Restart(void);
+void CRC_Enable(void);
+void CRC_Acummulate(uint32_t dato);
+uint32_t  CRC_Read(void);
+
+void DMA_Init();
+void DMA_Enable();
+
 
 int main(void)
 {
-    RCC_AHB1ENR |= BIT_22; //activa reloj para DMA2
+    CRC_Enable();
+    DMA_Init();
+    DMA_Enable();
 
-    for(int i = 0; i< MEMSIZE; i++){
+    for(int i = 0; i< NUM_WORDS; i++){
     	source[i] = i;
+    	//CRC_Acummulate(source[i]);
     }
+
+	while(1){}
+}
+
+void DMA_Enable(void){
+	DMA2_S0CR |= BIT_0;
+	while((DMA2_S0CR & BIT_0)== 0x0){} //Espera a que el bit se ponga en 1
+}
+
+void DMA_Init(void){
+    RCC_AHB1ENR |= BIT_22; //activa reloj para DMA2
+    for(int i = 0; i<100;i++){}
 
     DMA2_S0CR &= ~BIT_0; //Deshabilita DMA
     while((DMA2_S0CR & BIT_0)== 0x1){} //Espera a que el bit se ponga en 0
 
-    DMA2_S0CR |= BIT_7; //Habilita Memory to memory
-	DMA2_S0CR |=  BIT_13; //Source data size (Half word)- Peripheral Data Size
-	DMA2_S0CR |= BIT_11; //Destination data size (Half word) - Memory Data Size
-	DMA2_S0CR |= BIT_9; //PINC Habilita incrementar el puntero del source despues de cada transaccion.
-	DMA2_S0CR |= BIT_10; //MINC habilita incrementar el puntero del destination
-	DMA2_S0M0AR = (uint32_t)(destination); //destination
-	DMA2_S0PAR = (uint32_t)(source); //source
-	DMA2_S0NDTR = MEMSIZE;
-	DMA2_S0CR |= BIT_0;
+	DMA_HIFCR = 0xFFFFFFFF; //Limpia banderas de interrupcion
+	DMA_LIFCR = 0xFFFFFFFF; //Limpia banderas de interrupcion
 
-	while(1){}
+    DMA2_S0CR |= BIT_7; //Habilita Memory to memory
+	DMA2_S0CR |=  BIT_12; //Source data size (Full word)- Peripheral Data Size
+	DMA2_S0CR |= BIT_14; //Destination data size (Full word) - Memory Data Size
+	DMA2_S0CR |= BIT_9; //PINC Habilita incrementar el puntero del source despues de cada transaccion.
+	//DMA2_S0CR |= BIT_10; //MINC habilita incrementar el puntero del destination
+	DMA2_S0M0AR = (uint32_t)(CRC_DR_ADDRESS); //destination
+	DMA2_S0PAR = (uint32_t)(FLASH_START_ADDRESS); //source
+	DMA2_S0NDTR = NUM_WORDS;
+
+	DMA2_S0FCR |= BIT_2;//Habilitar FIFO
+	DMA2_S0FCR |= 0x03;//BIT_1 | BIT_0; //Threshold level: Full FIFO
+	DMA2_S0CR |= BIT_21; //PBURST: INCR4
+	DMA2_S0CR |= BIT_23; //MBURST: INCR4
+
+	DMA2_S0CR |= BIT_4; //Habilita interrupcion de transaccion completa.
+	//DMA2_S0CR |= BIT_0; //Habilita DMA
+}
+
+void CRC_Enable(){
+	int i = 0;
+	RCC_AHB1ENR |= BIT_12; //Activa reloj para CRC
+	for (i = 0; i < 1000; i++){}; //Espera a que el reloj se estabilice
+	CRC_Restart();
+}
+
+void CRC_Restart(void){
+	CRC_CR |= BIT_0;
+}
+
+void CRC_Acummulate(uint32_t dato){
+	CRC_DR = dato;
+}
+
+uint32_t CRC_Read(){
+	uint32_t dato;
+	dato = CRC_DR;
+	return dato;
 }

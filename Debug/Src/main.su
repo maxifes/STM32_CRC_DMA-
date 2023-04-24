@@ -1,1 +1,7 @@
-../Src/main.c:28:5:main	16	static
+../Src/main.c:39:5:main	16	static
+../Src/main.c:53:6:DMA_Enable	4	static
+../Src/main.c:58:6:DMA_Init	16	static
+../Src/main.c:86:6:CRC_Enable	16	static
+../Src/main.c:93:6:CRC_Restart	4	static
+../Src/main.c:97:6:CRC_Acummulate	16	static
+../Src/main.c:101:10:CRC_Read	16	static
